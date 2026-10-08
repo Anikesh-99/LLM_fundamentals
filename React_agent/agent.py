@@ -6,7 +6,10 @@ from tools import wikipedia_search_tool, get_current_weather, get_current_time, 
 from logger import Logger
 
 class ReAct:
-    def __init__(self, query: str):
+    def __init__(self, query: str, permission_fn=input, tool_overrides=None):
+        # permission_fn: how we ask the human (defaults to real stdin input).
+        # tool_overrides: {tool_name: func} to swap a tool's implementation (e.g. a test stub).
+        self.permission_fn = permission_fn
         self.required_confidence = 0.8
         self.query = query
         self.MAX_STEPS = 5
@@ -48,6 +51,10 @@ class ReAct:
                 "returns": "string absolute path",
             },
         }
+        if tool_overrides:
+            for name, fn in tool_overrides.items():
+                if name in self.tools:
+                    self.tools[name]["func"] = fn
         self.chat_id = uuid.uuid4()
         self.logger = Logger(self.chat_id)
         self.logger.log_action("start_chat", resp=self.query)      # LOG: the run's query
@@ -120,7 +127,7 @@ class ReAct:
             user_decision = None   # what the human answered, if we asked
             try:
                 if needs_permission:
-                    user_decision = input(f"Allow {action_name} with {action_input} (confidence {confidence})? [y/N] ").strip().lower()
+                    user_decision = self.permission_fn(f"Allow {action_name} with {action_input} (confidence {confidence})? [y/N] ").strip().lower()
                     if user_decision in ("y", "yes"):
                         obs = self.tools[action_name]["func"](**action_input)
                     else:
