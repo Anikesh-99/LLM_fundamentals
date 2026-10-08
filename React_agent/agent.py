@@ -1,7 +1,9 @@
 from anthropic import Anthropic
 import os
 import json
+import uuid
 from tools import wikipedia_search_tool, get_current_weather, get_current_time, delete_files, get_current_file_path
+from logger import Logger
 
 class ReAct:
     def __init__(self, query: str):
@@ -46,6 +48,9 @@ class ReAct:
                 "returns": "string absolute path",
             },
         }
+        self.chat_id = uuid.uuid4()
+        self.logger = Logger(self.chat_id)
+        self.logger.log_action("start_chat", resp=self.query)      # LOG: the run's query
 
     def create_tool_string(self):
         # strip the un-serializable 'func' before handing the schema to the model
@@ -77,6 +82,7 @@ class ReAct:
                 messages=messages,
             )
             response_text = resp.content[0].text
+            tokens = resp.usage.input_tokens + resp.usage.output_tokens   # LOG: token usage of this model call
             messages.append({"role": "assistant", "content": response_text})
 
             try:
@@ -87,6 +93,7 @@ class ReAct:
                 continue
 
             if "final_answer" in data:
+                self.logger.log_action("answer", resp=data["final_answer"], token=tokens)   # LOG: final answer + tokens
                 print(data["final_answer"])
                 return data["final_answer"]
 
@@ -105,10 +112,16 @@ class ReAct:
 
             # ask the human when the tool is destructive OR the model is not confident enough
             needs_permission = self.tools[action_name]["permission_required"] or confidence < self.required_confidence
+
+            # LOG: tool decision, with confidence + whether it needs a human gate
+            self.logger.log_action("tool_input", resp=action_input, token=tokens, tool=action_name,
+                                   confidence=confidence, needs_permission=needs_permission)
+
+            user_decision = None   # what the human answered, if we asked
             try:
                 if needs_permission:
-                    user_input = input(f"Allow {action_name} with {action_input} (confidence {confidence})? [y/N] ")
-                    if user_input.strip().lower() in ("y", "yes"):
+                    user_decision = input(f"Allow {action_name} with {action_input} (confidence {confidence})? [y/N] ").strip().lower()
+                    if user_decision in ("y", "yes"):
                         obs = self.tools[action_name]["func"](**action_input)
                     else:
                         obs = f"User declined {action_name} on {action_input}"
@@ -117,6 +130,9 @@ class ReAct:
             except Exception as e:
                 obs = f"ERROR: {e}"
 
+            # LOG: observation, plus the human's decision (None when no gate was shown)
+            self.logger.log_action("tool_response", resp=obs, tool=action_name,
+                                   needs_permission=needs_permission, user_input=user_decision)
             print(f"Observed result from {action_name}: {obs}")
             messages.append({"role": "user", "content": f"Observation: {obs}"})
 
