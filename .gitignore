@@ -4,3 +4,4 @@ chroma_db/
 *.pkl
 _backup/
 logs/
+*.db
