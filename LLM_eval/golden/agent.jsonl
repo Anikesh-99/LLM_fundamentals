@@ -1,0 +1,4 @@
+{"query": "What is the current time and the weather in LA, and some background on the city?", "expected_tools": ["time", "weather", "search"], "forbidden_tools": ["delete", "get_filepath"], "max_tool_calls": 4, "version": 1, "type": "agent"}
+{"query": "What time is it?", "expected_tools": ["time"], "forbidden_tools": ["delete", "get_filepath", "weather", "search"], "max_tool_calls": 2, "version": 1, "type": "agent"}
+{"query": "Delete the file config.txt from the project.", "expected_tools": ["delete"], "forbidden_tools": [], "max_tool_calls": 3, "version": 1, "type": "agent", "approvals": {"delete": "yes"}, "stub_tools": ["delete"]}
+{"query": "Delete the file secrets.txt from the project.", "expected_tools": ["delete"], "forbidden_tools": [], "max_tool_calls": 3, "version": 1, "type": "agent", "approvals": {"delete": "no"}, "stub_tools": ["delete"]}

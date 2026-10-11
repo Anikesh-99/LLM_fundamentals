@@ -64,8 +64,8 @@ def evaluate():
                 return f"[stub] {tname} executed on {file_path or kw}"
             overrides[tname] = _stub
 
-        agent = ReAct(task["query"], permission_fn=permission_fn, tool_overrides=overrides)
-        answer = agent.generate_answer()
+        agent = ReAct(permission_fn=permission_fn, tool_overrides=overrides)
+        answer = agent.generate_answer(task["query"])
         rep = trajectory_report(load_trajectory(agent.logger.filepath), task)
 
         mention_ok = all(m.lower() in (answer or "").lower() for m in task["answer_must_mention"])

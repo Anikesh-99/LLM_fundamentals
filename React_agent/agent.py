@@ -6,12 +6,11 @@ from tools import wikipedia_search_tool, get_current_weather, get_current_time, 
 from logger import Logger
 
 class ReAct:
-    def __init__(self, query: str, permission_fn=input, tool_overrides=None):
+    def __init__(self, permission_fn=input, tool_overrides=None, chat_id = None):
         # permission_fn: how we ask the human (defaults to real stdin input).
         # tool_overrides: {tool_name: func} to swap a tool's implementation (e.g. a test stub).
         self.permission_fn = permission_fn
         self.required_confidence = 0.8
-        self.query = query
         self.MAX_STEPS = 5
         self.client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         self.tools = {
@@ -55,16 +54,17 @@ class ReAct:
             for name, fn in tool_overrides.items():
                 if name in self.tools:
                     self.tools[name]["func"] = fn
-        self.chat_id = uuid.uuid4()
+        if not chat_id: self.chat_id = uuid.uuid4()
+        else: self.chat_id = chat_id
         self.logger = Logger(self.chat_id)
-        self.logger.log_action("start_chat", resp=self.query)      # LOG: the run's query
+        self.logger.log_action("start_chat", resp="Started up a chat")      # LOG: the run's query
 
     def create_tool_string(self):
         # strip the un-serializable 'func' before handing the schema to the model
         view = {name: {k: v for k, v in meta.items() if k != "func"} for name, meta in self.tools.items()}
         return json.dumps(view, indent=2)
 
-    def generate_answer(self):
+    def generate_answer(self, query):
         system_prompt = (
             "You are a smart assistant with access to tools.\n"
             "To use a tool, respond with ONLY a JSON object in this exact format:\n"
@@ -77,7 +77,7 @@ class ReAct:
             '{"final_answer": "<your answer>"}'
         )
 
-        messages = [{"role": "user", "content": self.query}]
+        messages = [{"role": "user", "content": query}]
         steps = 0
         while steps < self.MAX_STEPS:
             steps += 1
@@ -146,5 +146,5 @@ class ReAct:
         return "Exceeded max steps so stopped generating answer"
 
 
-if __name__ == "__main__":
-    ReAct("Find the current time and weather in LA and give me some information about the city itself").generate_answer()
+# if __name__ == "__main__":
+#     ReAct().generate_answer("Find the current time and weather in LA and give me some information about the city itself")
